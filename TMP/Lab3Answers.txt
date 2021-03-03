@@ -1,0 +1,72 @@
+Q1) The priority inversion problem could cause that a higher-priority process needs to wait for the completion of a lower-priority process.
+    1)Priority inheritance is one approach to address this issue. Please give another approach and briefly describe its idea.
+    2)Design a test case to show that your approach can address the priority inversion problem. You should compare the results that derived from the original XINU implementation (use semaphore) and that derived from your implementation (use readers/writer locks). Put your results in Lab3Answers.txt and your test case program (name it task1.c) in both ./sys and ./TMP
+
+ANS:
+1) Another approach is Priority Ceiling Protocol:
+    a) The priority of the highest priority process that uses the lock is the ceiling.
+    b) If a process wants a lock, it can only do so if priority of the process is strictly higher than the ceilings of all locks(priority) currently locked by other process.
+    c) if not, process will be blocked. When a process acquired a lock then, priority of the process is changed to ceiling priority.
+
+2) Output of task1
+
+    ********** Semaphore approach **********
+    -start writer, then sleep 1s. sem granted to writer (prio 10), pid = 46
+    Reader R: to acquire sem
+    Reader R: acquired sem, sleep 10s
+    -start reader A, then sleep 1s. reader A(prio 20) blocked on the sem, pid = 48
+    Writer A: to acquire sem
+    -start reader B, then sleep 1s. reader B(prio 30) blocked on the sem, pid = 47
+    Writer B: to acquire sem
+    RRRRRRRRRR
+    Reader R: to release sem
+    Writer A: acquired sem
+    AAAAAAAAAA
+    Writer A: to release sem
+    Writer B: acquired sem
+    BBBBBBBBBB
+    Writer B: to release sem
+
+    ****************************************
+
+    ********** Priority Inheritance approach **********
+    -start writer, then sleep 1s. lock granted to writer (prio 10), pid = 43
+    Reader R: to acquire lock: 43
+    Reader R: acquired lock, sleep 10s
+    -start reader A, then sleep 1s. reader A(prio 20) blocked on the lock, pid = 45
+    Writer A: to acquire lock: 45
+    -start reader B, then sleep 1s. reader B(prio 30) blocked on the lock, pid = 44
+    Reader B: to acquire lock: 44
+    Reader B: acquired lock, sleep 10s
+    RRRRRRRRRR
+    Reader R: to release lock
+    BBBBBBBBBB
+    Reader B: to release lock
+    Writer A: acquired lock
+    AAAAAAAAAA
+    Writer A: to release lock
+
+    ******************************
+    Original Xinu Semaphore implementation:
+        The priority of the writer does not change remains same even when there are higher priority process trying to acquire the lock. This results in starvation of the higher priority process waiting on the semaphore.
+
+    Priority Inheritance Implementation:
+        The priority of the writer changes to the highest priority process waiting in the queue. Thus, writer process will have sufficient time to completed execution of the critical section.
+
+
+
+
+Q2) Synchronization is a quite complex issue in operating systems. To show your understanding about process synchronization, you are asked to point out a reader/writer synchronization issue in this pesudo-code: task2_sync_issue.c. Multiple reader threads can execute this code concurrently by calling do_update. All the variables starting with global_ are global variables. You are asked to describe the potential issue caused by the incorrect synchronization and point out at least one possible thread interleaving that would trigger the problem. Put your answer in Lab3Answers.txt mentioned above.
+
+ANS:
+    The critical section is the try_update function, and uses counting semaphore to control access buffer_add(). Initially the counting semaphore is set to 10. 10 process can write into buffer. In case of interleaving threads, one thread can overwrite the data written by the other thread.
+
+    Consider two threads T1 and T2. T1 acquires reader locks and execute try_update function. If (global_now >= newtime) = False, reduces count and starts writing in buffer_add(). When T1 execute memcpy(), then T2 is preempted.
+
+    T2 starts executing the same steps, and writes to buffer_add(). Since T1 has not existed the critical section, therefore T2 overwrites data written by T1.
+
+    Therefore, the lock should be exclusive to avoid this scenario.
+
+
+
+
